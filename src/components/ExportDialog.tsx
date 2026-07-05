@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppStore } from '../state/store';
 import { exportFullHtml } from '../core/exporter/exportFull';
 import { exportDivHtml } from '../core/exporter/exportDiv';
+import { exportCssOnly } from '../core/exporter/exportCss';
 import type { ImageStrategy } from '../core/types';
 
 const IMAGE_STRATEGIES: { value: ImageStrategy; label: string; hint: string }[] = [
@@ -24,6 +25,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const setImageStrategy = useAppStore((s) => s.setImageStrategy);
 
   const [output, setOutput] = useState('');
+  const [outputKind, setOutputKind] = useState<'html' | 'css'>('html');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -38,17 +40,24 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           ? await exportFullHtml(doc, overrides, imageStrategy, tistoryImageText)
           : await exportDivHtml(doc, overrides, imageStrategy, tistoryImageText);
       setOutput(html);
+      setOutputKind('html');
     } finally {
       setBusy(false);
     }
   };
 
+  const generateCss = () => {
+    setCopied(false);
+    setOutput(exportCssOnly(doc, exportMode));
+    setOutputKind('css');
+  };
+
   const download = () => {
-    const blob = new Blob([output], { type: 'text/html' });
+    const blob = new Blob([output], { type: outputKind === 'css' ? 'text/css' : 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${doc.title || 'export'}.html`;
+    a.download = `${doc.title || 'export'}.${outputKind}`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -106,9 +115,14 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <button className="anx-btn primary" onClick={generate} disabled={busy}>
-          {busy ? '생성 중…' : '내보내기 HTML 생성'}
-        </button>
+        <div className="anx-btn-row">
+          <button className="anx-btn primary" onClick={generate} disabled={busy}>
+            {busy ? '생성 중…' : '내보내기 HTML 생성'}
+          </button>
+          <button className="anx-btn" onClick={generateCss} disabled={busy}>
+            CSS만 내보내기
+          </button>
+        </div>
 
         {output && (
           <>
@@ -118,7 +132,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                 {copied ? '복사됨!' : '클립보드 복사'}
               </button>
               <button className="anx-btn" onClick={download}>
-                .html 다운로드
+                .{outputKind} 다운로드
               </button>
             </div>
             <p className="anx-hint">용량: {(new Blob([output]).size / 1024).toFixed(1)} KB</p>
